@@ -102,7 +102,7 @@ def demo():
     agent_net.eval()
     
     print("\n" + "="*50)
-    print("🎓 Personalized Learning Recommendation DEMO (Optimized)")
+    print("Personalized Learning Recommendation DEMO (Optimized)")
     print("="*50)
     
     state = env.reset()
@@ -112,7 +112,7 @@ def demo():
     for t in range(10): 
         state_q, state_r = state
         
-        
+       
         already_done = set(env.current_q)
         
         with torch.no_grad():
@@ -128,7 +128,7 @@ def demo():
         next_state, response, prob, original_qid = env.step(action)
         state = next_state
         
-        status = "✅ Correct" if response == 1 else "❌ Incorrect"
+        status = "Correct" if response == 1 else "Incorrect"
         print(f"Step {t+1}: Agent Recommends QID {original_qid} (Mapped {action})")
         print(f"        -> Simulator Prediction: {prob:.1%} chance to solve")
         print(f"        -> Student Result: {status}")

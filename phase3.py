@@ -31,6 +31,7 @@ class DKT(nn.Module):
         input_feat = self.interaction_embed(input_feat)     
         lstm_out, _ = self.lstm(input_feat); return self.out(lstm_out)
 
+
 class StudentEnv:
     def __init__(self, model_path, map_path, data_file):
         self.device = torch.device("cpu")
@@ -89,7 +90,7 @@ class StudentEnv:
         elif pred_prob > 0.9: reward -= 1.0
         elif pred_prob < 0.2: reward -= 1.0
             
-       
+        
         if self.current_q.count(action) > 1: reward = -5.0
             
         original_qid = self.idx_to_qid.get(action, -1)

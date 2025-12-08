@@ -27,7 +27,6 @@ CONFIG = {
     'MEMORY_SIZE': 50000
 }
 
-
 class DKT(nn.Module):
     def __init__(self, num_questions, embed_dim, hidden_dim):
         super(DKT, self).__init__()
@@ -46,13 +45,13 @@ class DKT(nn.Module):
         logits = self.out(lstm_out)
         return logits
 
-    
+
     def get_knowledge_state(self, q_seq, r_seq):
         q_emb = self.q_embed(q_seq)
         r_reshaped = r_seq.unsqueeze(-1)
         input_feat = torch.cat([q_emb, r_reshaped], dim=-1)
         input_feat = self.interaction_embed(input_feat)
-       
+        
         _, (hn, cn) = self.lstm(input_feat)
         
         return hn[-1]
@@ -100,20 +99,19 @@ class StudentEnv:
         new_mastery = self._get_mastery()
         gain = new_mastery - self.history_mastery
         self.history_mastery = new_mastery
-        
-       
+     
         reward = 0
         reward += gain * 500.0  
         
-        
+     
         if 0.4 <= pred_prob <= 0.7:
             reward += 0.5 
         
-        
+      
         if pred_prob > 0.95 or pred_prob < 0.1:
             reward -= 1.0
             
-      
+    
         if self.current_q.count(action) > 1:
             reward = -5.0
             
@@ -125,7 +123,7 @@ class StudentEnv:
             r_t = torch.tensor([self.current_r], dtype=torch.float).to(self.device)
             return torch.sigmoid(self.simulator(q_t, r_t)[0, -1, :]).mean().item()
 
-    
+
     def _get_state(self):
         q = self.current_q[-CONFIG['MAX_SEQ_LEN']:] + [0]*max(0, CONFIG['MAX_SEQ_LEN']-len(self.current_q))
         r = self.current_r[-CONFIG['MAX_SEQ_LEN']:] + [0]*max(0, CONFIG['MAX_SEQ_LEN']-len(self.current_r))
@@ -133,16 +131,16 @@ class StudentEnv:
         r_t = torch.tensor([r[-CONFIG['MAX_SEQ_LEN']:]], dtype=torch.float).to(self.device)
         
         with torch.no_grad():
-            
+           
             hidden_state = self.simulator.get_knowledge_state(q_t, r_t)
-            
+            # hidden_state shape: [1, 128] -> squeeze -> [128]
             return hidden_state.squeeze(0).numpy()
 
 
 class DQN(nn.Module):
     def __init__(self, num_questions, state_dim, hidden_dim):
         super(DQN, self).__init__()
-        
+       
         self.fc1 = nn.Linear(state_dim, hidden_dim)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, num_questions + 1)
@@ -232,8 +230,8 @@ if __name__ == "__main__":
         
         if episode > 100 and avg > best_avg_reward:
             best_avg_reward = avg
-            torch.save(agent.policy_net.state_dict(), "rl_agent_advanced.pth") 
-            print(f"🌟 New Best: {best_avg_reward:.2f} (Ep {episode+1})")
+            torch.save(agent.policy_net.state_dict(), "rl_agent_advanced.pth")
+            print(f"New Best: {best_avg_reward:.2f} (Ep {episode+1})")
         
         if (episode+1) % 50 == 0:
             print(f"Ep {episode+1} | Total: {total_reward:.2f} | Avg: {avg:.2f} | Best: {best_avg_reward:.2f}")

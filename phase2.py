@@ -36,7 +36,7 @@ def build_and_save_map(file_paths):
             
         for q_raw in df['questions']:
             if pd.isna(q_raw): continue
-           
+            
             q_ids = [int(float(x)) for x in str(q_raw).split(',') if x != '']
             unique_q.update(q_ids)
             
@@ -57,7 +57,7 @@ class KTDataset(Dataset):
     def __init__(self, file_path, qid_map, max_len=100):
         self.max_len = max_len
         self.samples = []
-        self.qid_map = qid_map 
+        self.qid_map = qid_map
         
         print(f"Processing {file_path}...")
         if file_path.endswith('.xlsx'):
@@ -130,11 +130,11 @@ def train():
    
     qid_map = build_and_save_map([CONFIG['TRAIN_FILE'], CONFIG['TEST_FILE']])
     
-   
+    
     NUM_QUESTIONS_MAPPED = len(qid_map)
     print(f"Total Mapped Questions: {NUM_QUESTIONS_MAPPED}")
     
-   
+    
     train_dataset = KTDataset(CONFIG['TRAIN_FILE'], qid_map, CONFIG['MAX_SEQ_LEN'])
     train_loader = DataLoader(train_dataset, batch_size=CONFIG['BATCH_SIZE'], shuffle=True, collate_fn=collate_fn)
     
