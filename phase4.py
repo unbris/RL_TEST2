@@ -7,13 +7,11 @@ import json
 import random
 from collections import deque
 
-# ===========================
-# 1. 配置参数
-# ===========================
+
 CONFIG = {
     'MAX_SEQ_LEN': 50,
     'EMBED_DIM': 64,
-    'HIDDEN_DIM': 128,       # 知识状态向量的维度
+    'HIDDEN_DIM': 128,       
     'MODEL_PATH': 'student_simulator.pth',
     'MAP_PATH': 'qid_map.json',
     'TEST_FILE': 'test.csv',
@@ -29,9 +27,7 @@ CONFIG = {
     'MEMORY_SIZE': 50000
 }
 
-# ===========================
-# 2. DKT 模型 (增加获取隐藏状态的功能)
-# ===========================
+
 class DKT(nn.Module):
     def __init__(self, num_questions, embed_dim, hidden_dim):
         super(DKT, self).__init__()
@@ -50,20 +46,18 @@ class DKT(nn.Module):
         logits = self.out(lstm_out)
         return logits
 
-    # 🔥 新增功能：提取学生大脑状态 (Hidden State)
+    
     def get_knowledge_state(self, q_seq, r_seq):
         q_emb = self.q_embed(q_seq)
         r_reshaped = r_seq.unsqueeze(-1)
         input_feat = torch.cat([q_emb, r_reshaped], dim=-1)
         input_feat = self.interaction_embed(input_feat)
-        # 获取 LSTM 的最后时刻隐藏状态 (hn)
+       
         _, (hn, cn) = self.lstm(input_feat)
-        # hn shape: [num_layers, batch, hidden] -> 取最后一层: [batch, hidden]
+        
         return hn[-1]
 
-# ===========================
-# 3. 环境 (输出 Advanced State)
-# ===========================
+
 class StudentEnv:
     def __init__(self, model_path, map_path, data_file):
         self.device = torch.device("cpu")
@@ -107,19 +101,19 @@ class StudentEnv:
         gain = new_mastery - self.history_mastery
         self.history_mastery = new_mastery
         
-        # --- 混合奖励 (Hybrid Reward) ---
+       
         reward = 0
-        reward += gain * 500.0  # 稍微温和一点的放大，配合 ZPD
+        reward += gain * 500.0  
         
-        # ZPD 引导 (回归初心，但有 Masking 保护，不怕死循环)
+        
         if 0.4 <= pred_prob <= 0.7:
             reward += 0.5 
         
-        # 惩罚极端
+        
         if pred_prob > 0.95 or pred_prob < 0.1:
             reward -= 1.0
             
-        # 严厉去重
+      
         if self.current_q.count(action) > 1:
             reward = -5.0
             
@@ -131,7 +125,7 @@ class StudentEnv:
             r_t = torch.tensor([self.current_r], dtype=torch.float).to(self.device)
             return torch.sigmoid(self.simulator(q_t, r_t)[0, -1, :]).mean().item()
 
-    # 🔥 核心升级：返回知识向量 (Hidden State) 而不是 ID 序列
+    
     def _get_state(self):
         q = self.current_q[-CONFIG['MAX_SEQ_LEN']:] + [0]*max(0, CONFIG['MAX_SEQ_LEN']-len(self.current_q))
         r = self.current_r[-CONFIG['MAX_SEQ_LEN']:] + [0]*max(0, CONFIG['MAX_SEQ_LEN']-len(self.current_r))
@@ -139,24 +133,22 @@ class StudentEnv:
         r_t = torch.tensor([r[-CONFIG['MAX_SEQ_LEN']:]], dtype=torch.float).to(self.device)
         
         with torch.no_grad():
-            # 调用 DKT 的新方法获取 hidden state
+            
             hidden_state = self.simulator.get_knowledge_state(q_t, r_t)
-            # hidden_state shape: [1, 128] -> squeeze -> [128]
+            
             return hidden_state.squeeze(0).numpy()
 
-# ===========================
-# 4. 新版 DQN (MLP 架构)
-# ===========================
+
 class DQN(nn.Module):
     def __init__(self, num_questions, state_dim, hidden_dim):
         super(DQN, self).__init__()
-        # 输入不再是序列，而是知识向量 (state_dim = 128)
+        
         self.fc1 = nn.Linear(state_dim, hidden_dim)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, num_questions + 1)
 
     def forward(self, state):
-        # state shape: [batch, state_dim]
+        
         x = self.relu(self.fc1(state))
         return self.fc2(x)
 
@@ -164,7 +156,7 @@ class Agent:
     def __init__(self, num_questions):
         self.device = torch.device("cpu")
         self.num_questions = num_questions
-        # 注意：这里 DQN 的输入维度是 HIDDEN_DIM (128)
+        
         self.policy_net = DQN(num_questions, CONFIG['HIDDEN_DIM'], 256).to(self.device)
         self.target_net = DQN(num_questions, CONFIG['HIDDEN_DIM'], 256).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -192,7 +184,7 @@ class Agent:
         batch = random.sample(self.memory, CONFIG['RL_BATCH_SIZE'])
         bs, ba, br, bns, bd = zip(*batch)
         
-        # State 现在是向量，直接转 tensor
+        
         state = torch.tensor(np.array(bs), dtype=torch.float).to(self.device)
         next_state = torch.tensor(np.array(bns), dtype=torch.float).to(self.device)
         actions = torch.tensor(ba, dtype=torch.long).unsqueeze(1).to(self.device)
@@ -209,9 +201,7 @@ class Agent:
         self.optimizer.zero_grad(); loss.backward(); self.optimizer.step()
         if self.epsilon > CONFIG['EPSILON_END']: self.epsilon *= CONFIG['EPSILON_DECAY']
 
-# ===========================
-# 5. 主训练循环 (SAVE BEST)
-# ===========================
+
 if __name__ == "__main__":
     print("Initializing Advanced RL System...")
     env = StudentEnv(CONFIG['MODEL_PATH'], CONFIG['MAP_PATH'], CONFIG['TEST_FILE'])
@@ -242,7 +232,7 @@ if __name__ == "__main__":
         
         if episode > 100 and avg > best_avg_reward:
             best_avg_reward = avg
-            torch.save(agent.policy_net.state_dict(), "rl_agent_advanced.pth") # 保存为新名字
+            torch.save(agent.policy_net.state_dict(), "rl_agent_advanced.pth") 
             print(f"🌟 New Best: {best_avg_reward:.2f} (Ep {episode+1})")
         
         if (episode+1) % 50 == 0:

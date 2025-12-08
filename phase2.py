@@ -5,11 +5,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-import json # 新增：用于保存映射表
+import json 
 
-# ===========================
-# 1. 配置参数
-# ===========================
+
 CONFIG = {
     'MAX_SEQ_LEN': 100,
     'EMBED_DIM': 64,
@@ -17,13 +15,11 @@ CONFIG = {
     'BATCH_SIZE': 32,
     'EPOCHS': 10,
     'LR': 0.001,
-    'TRAIN_FILE': 'train.xlsx', # 确保文件名正确
+    'TRAIN_FILE': 'train.xlsx', 
     'TEST_FILE': 'test.csv'
 }
 
-# ===========================
-# 2. 辅助函数：构建映射表
-# ===========================
+
 def build_and_save_map(file_paths):
     print("Scanning files to build ID map...")
     unique_q = set()
@@ -40,30 +36,28 @@ def build_and_save_map(file_paths):
             
         for q_raw in df['questions']:
             if pd.isna(q_raw): continue
-            # 提取所有出现的ID
+           
             q_ids = [int(float(x)) for x in str(q_raw).split(',') if x != '']
             unique_q.update(q_ids)
             
-    # 建立映射: 原始ID -> 连续索引 (从1开始，0留给Padding)
+
     sorted_ids = sorted(list(unique_q))
     qid_map = {original_id: idx+1 for idx, original_id in enumerate(sorted_ids)}
     
     print(f"Found {len(qid_map)} unique questions. Map saved.")
     
-    # 保存映射表到文件
+
     with open('qid_map.json', 'w') as f:
         json.dump(qid_map, f)
         
     return qid_map
 
-# ===========================
-# 3. 数据处理 (带映射)
-# ===========================
+
 class KTDataset(Dataset):
     def __init__(self, file_path, qid_map, max_len=100):
         self.max_len = max_len
         self.samples = []
-        self.qid_map = qid_map # 持有映射表
+        self.qid_map = qid_map 
         
         print(f"Processing {file_path}...")
         if file_path.endswith('.xlsx'):
@@ -82,13 +76,10 @@ class KTDataset(Dataset):
             q_seq_raw = [int(float(x)) for x in str(q_raw).split(',') if x != '']
             r_seq = [int(float(x)) for x in str(r_raw).split(',') if x != '']
             
-            # --- 关键修改：将原始ID映射为连续索引 ---
-            # 如果遇到没见过的ID (比如测试集中特有的)，可以直接跳过或映射为未知(这里选择跳过该题)
+            
             q_seq_mapped = [self.qid_map[q] for q in q_seq_raw if q in self.qid_map]
             
-            # 保持 q 和 r 长度一致 (因为跳过未知ID可能会导致变短)
-            # 这里简化处理：假设 map 覆盖了绝大多数数据。
-            # 严格做法是同时过滤 r_seq。
+            
             valid_indices = [i for i, q in enumerate(q_seq_raw) if q in self.qid_map]
             q_seq = [self.qid_map[q_seq_raw[i]] for i in valid_indices]
             r_seq = [r_seq[i] for i in valid_indices]
@@ -96,7 +87,7 @@ class KTDataset(Dataset):
             min_len = min(len(q_seq), len(r_seq))
             if min_len == 0: continue
             
-            q_seq = q_seq[:min_len][-max_len:] # 截断
+            q_seq = q_seq[:min_len][-max_len:] 
             r_seq = r_seq[:min_len][-max_len:]
             
             self.samples.append((q_seq, r_seq))
@@ -114,14 +105,12 @@ def collate_fn(batch):
     r_padded = pad_sequence(r_batch, batch_first=True, padding_value=-1)
     return q_padded, r_padded
 
-# ===========================
-# 4. 模型定义 (DKT)
-# ===========================
+
 class DKT(nn.Module):
     def __init__(self, num_questions, embed_dim, hidden_dim):
         super(DKT, self).__init__()
         self.hidden_dim = hidden_dim
-        # num_questions 是映射后的总数量，Embedding 不需要很大了
+        
         self.q_embed = nn.Embedding(num_questions + 1, embed_dim, padding_idx=0)
         self.interaction_embed = nn.Linear(embed_dim + 1, embed_dim) 
         self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True)
@@ -136,23 +125,21 @@ class DKT(nn.Module):
         logits = self.out(lstm_out)
         return logits
 
-# ===========================
-# 5. 训练主流程
-# ===========================
+
 def train():
-    # 1. 先构建映射表 (同时扫描训练集和测试集，保证覆盖)
+   
     qid_map = build_and_save_map([CONFIG['TRAIN_FILE'], CONFIG['TEST_FILE']])
     
-    # 自动计算题目数量 (最大索引)
+   
     NUM_QUESTIONS_MAPPED = len(qid_map)
     print(f"Total Mapped Questions: {NUM_QUESTIONS_MAPPED}")
     
-    # 2. 加载数据
+   
     train_dataset = KTDataset(CONFIG['TRAIN_FILE'], qid_map, CONFIG['MAX_SEQ_LEN'])
     train_loader = DataLoader(train_dataset, batch_size=CONFIG['BATCH_SIZE'], shuffle=True, collate_fn=collate_fn)
     
-    # 3. 初始化模型
-    device = torch.device("cpu") # 保持 CPU
+    
+    device = torch.device("cpu") 
     print("Using CPU for training...")
     
     model = DKT(NUM_QUESTIONS_MAPPED, CONFIG['EMBED_DIM'], CONFIG['HIDDEN_DIM']).to(device)
@@ -170,7 +157,7 @@ def train():
             in_q = q_batch[:, :-1]
             in_r = r_batch[:, :-1]
             target_r = r_batch[:, 1:]
-            target_q = q_batch[:, 1:] # 这里已经是映射过的连续ID了
+            target_q = q_batch[:, 1:] 
             
             if in_q.shape[1] == 0: continue
             
@@ -179,7 +166,7 @@ def train():
             pred_logits = torch.gather(logits, 2, target_q_idx).squeeze(-1)
             
             mask = (target_r != -1)
-            if mask.sum() == 0: continue # 防止空batch报错
+            if mask.sum() == 0: continue 
             loss = criterion(pred_logits[mask], target_r[mask])
             
             loss.backward()

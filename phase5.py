@@ -5,9 +5,7 @@ import json
 import random
 import torch.nn as nn
 
-# ===========================
-# 配置
-# ===========================
+
 CONFIG = {
     'MAX_SEQ_LEN': 50,
     'EMBED_DIM': 64,
@@ -18,9 +16,7 @@ CONFIG = {
     'TEST_FILE': 'test.csv',
 }
 
-# ===========================
-# 类定义
-# ===========================
+
 class DKT(nn.Module):
     def __init__(self, num_questions, embed_dim, hidden_dim):
         super(DKT, self).__init__()
@@ -96,9 +92,7 @@ class StudentEnv:
         r = self.current_r[-CONFIG['MAX_SEQ_LEN']:] + [0]*max(0, CONFIG['MAX_SEQ_LEN']-len(self.current_r))
         return np.array(q[-CONFIG['MAX_SEQ_LEN']:]), np.array(r[-CONFIG['MAX_SEQ_LEN']:])
 
-# ===========================
-# 3. 演示主程序
-# ===========================
+
 def demo():
     print("Loading Environment and Agent...")
     env = StudentEnv(CONFIG['MODEL_PATH'], CONFIG['MAP_PATH'], CONFIG['TEST_FILE'])
@@ -118,13 +112,13 @@ def demo():
     for t in range(10): 
         state_q, state_r = state
         
-        # --- ✅ 获取已做题列表 ---
+        
         already_done = set(env.current_q)
         
         with torch.no_grad():
             q_vals = agent_net(torch.tensor([state_q], dtype=torch.long), torch.tensor([state_r], dtype=torch.float))
             
-            # --- ✅ 强力去重 (Action Masking) ---
+           
             for idx in already_done:
                 if idx < q_vals.shape[1]: q_vals[0, idx] = -1e9
             q_vals[0, 0] = -1e9 # Mask padding

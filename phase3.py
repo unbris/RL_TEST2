@@ -5,9 +5,7 @@ import torch.nn as nn
 import json
 import random
 
-# ===========================
-# 配置
-# ===========================
+
 CONFIG = {
     'MAX_SEQ_LEN': 50,
     'EMBED_DIM': 64,
@@ -18,9 +16,7 @@ CONFIG = {
     'MAX_STEPS': 20
 }
 
-# ===========================
-# 模型定义
-# ===========================
+
 class DKT(nn.Module):
     def __init__(self, num_questions, embed_dim, hidden_dim):
         super(DKT, self).__init__()
@@ -35,9 +31,6 @@ class DKT(nn.Module):
         input_feat = self.interaction_embed(input_feat)     
         lstm_out, _ = self.lstm(input_feat); return self.out(lstm_out)
 
-# ===========================
-# 环境定义 (同步 Phase 4 的新逻辑)
-# ===========================
 class StudentEnv:
     def __init__(self, model_path, map_path, data_file):
         self.device = torch.device("cpu")
@@ -87,16 +80,16 @@ class StudentEnv:
         new_mastery = self._get_mastery(); gain = new_mastery - self.history_mastery
         self.history_mastery = new_mastery
         
-        # --- 同步的新奖励函数 ---
+        
         reward = 0
         reward += gain * 200.0 
         
-        # 难度奖励 (ZPD)
+        
         if 0.3 <= pred_prob <= 0.75: reward += 1.5
         elif pred_prob > 0.9: reward -= 1.0
         elif pred_prob < 0.2: reward -= 1.0
             
-        # 重复惩罚
+       
         if self.current_q.count(action) > 1: reward = -5.0
             
         original_qid = self.idx_to_qid.get(action, -1)
@@ -117,9 +110,7 @@ class StudentEnv:
         r = self.current_r[-CONFIG['MAX_SEQ_LEN']:] + [0]*max(0, CONFIG['MAX_SEQ_LEN']-len(self.current_r))
         return np.array(q[-CONFIG['MAX_SEQ_LEN']:]), np.array(r[-CONFIG['MAX_SEQ_LEN']:])
 
-# ===========================
-# 测试运行
-# ===========================
+
 if __name__ == "__main__":
     env = StudentEnv(CONFIG['MODEL_PATH'], CONFIG['MAP_PATH'], CONFIG['TEST_FILE'])
     state = env.reset()
@@ -127,6 +118,6 @@ if __name__ == "__main__":
     valid_actions = list(env.qid_map.values())
     
     for t in range(5):
-        action = random.choice(valid_actions) # 随机动作
+        action = random.choice(valid_actions) 
         next_state, reward, done, info = env.step(action)
         print(f"Step {t+1}: Rec QID {info['original_id']} | Prob: {info['prob']:.1%} | Reward: {reward:.2f}")
